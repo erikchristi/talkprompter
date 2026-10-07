@@ -9,13 +9,13 @@
     <SolidColorBrush x:Key="Muted" Color="#5D6775" />
     <SolidColorBrush x:Key="Accent" Color="#3B7DF2" />
     <SolidColorBrush x:Key="AccentText" Color="#FFFFFF" />
-    <SolidColorBrush x:Key="Highlight" Color="#FFD37A" />
-    <SolidColorBrush x:Key="HighlightText" Color="#241A05" />
+    <!-- Box behind the current word; translucent because the word keeps its text color -->
+    <SolidColorBrush x:Key="Highlight" Color="#99FFD37A" />
     <SolidColorBrush x:Key="TrackingCol" Color="#0FA968" />
     <SolidColorBrush x:Key="PausedCol" Color="#C97E0A" />
     <SolidColorBrush x:Key="LostCol" Color="#D64545" />
 
-    <!-- Hover veil laid over buttons; opacity is animated by the templates -->
+    <!-- Hover veil laid over buttons; the templates switch its opacity -->
     <SolidColorBrush x:Key="VeilBrush" Color="#000000" />
 
     <!-- Overlays and accessories -->
@@ -23,14 +23,5 @@
     <SolidColorBrush x:Key="HeardStripBg" Color="#F2FFFFFF" />
     <SolidColorBrush x:Key="MeterTrack" Color="#1F000000" />
     <SolidColorBrush x:Key="ScrollThumb" Color="#B9C2CF" />
-
-    <LinearGradientBrush x:Key="TopFade" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="#F3F5F9" Offset="0" />
-        <GradientStop Color="#00F3F5F9" Offset="1" />
-    </LinearGradientBrush>
-    <LinearGradientBrush x:Key="BottomFade" StartPoint="0,1" EndPoint="0,0">
-        <GradientStop Color="#F3F5F9" Offset="0" />
-        <GradientStop Color="#00F3F5F9" Offset="1" />
-    </LinearGradientBrush>
 
 </ResourceDictionary>

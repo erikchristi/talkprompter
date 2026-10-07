@@ -13,7 +13,7 @@ public sealed record AppSettings
 {
     public string? ScriptText { get; init; }
     public double FontSize { get; init; } = 52;
-    public double ScrollSmoothness { get; init; } = 0.22;
+    public double ScrollSmoothness { get; init; } = 0.15;
     public double Sensitivity { get; init; } = 0.6;
     public double ColumnWidth { get; init; } = 680;
     public bool MirrorHorizontal { get; init; }
@@ -23,6 +23,9 @@ public sealed record AppSettings
     public string? MicrophoneName { get; init; }
     public bool ShowHeardText { get; init; }
     public bool FlowModeEnabled { get; init; }
+
+    /// <summary>Keep the app's windows out of screen recordings and screen shares.</summary>
+    public bool HideFromCapture { get; init; } = true;
 
     /// <summary>Velopack update feed: a folder path, https URL, or GitHub repo URL. Empty disables updates.</summary>
     public string UpdateFeedUrl { get; init; } = "https://github.com/Sven-Bo/talkprompter";

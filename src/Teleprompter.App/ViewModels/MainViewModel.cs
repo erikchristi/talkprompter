@@ -72,13 +72,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         InitialSettings = JsonSettingsStore.Load();
         _fontSize = Math.Clamp(InitialSettings.FontSize, 24, 120);
-        _scrollSmoothness = Math.Clamp(InitialSettings.ScrollSmoothness, 0.12, 0.9);
+        // Values above the range come from the old 0.12-0.9 slider, whose slow
+        // end made the view trail the voice by a second; reset those to default.
+        _scrollSmoothness = InitialSettings.ScrollSmoothness is >= 0.06 and <= 0.35
+            ? InitialSettings.ScrollSmoothness
+            : DefaultScrollSmoothness;
         _sensitivity = Math.Clamp(InitialSettings.Sensitivity, 0.0, 1.0);
         _columnWidth = Math.Clamp(InitialSettings.ColumnWidth, 360, 1600);
         _mirrorHorizontal = InitialSettings.MirrorHorizontal;
         _countdownEnabled = InitialSettings.CountdownEnabled;
         _showHeardText = InitialSettings.ShowHeardText;
         _flowModeEnabled = InitialSettings.FlowModeEnabled;
+        _hideFromCapture = InitialSettings.HideFromCapture;
         if (EngineChoices.Contains(InitialSettings.EngineChoice))
         {
             _selectedEngineChoice = InitialSettings.EngineChoice;
@@ -113,7 +118,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _selectedDevice = Devices.FirstOrDefault(d => d.Name == InitialSettings.MicrophoneName)
             ?? Devices.FirstOrDefault();
 
-        _updates = new UpdateService(InitialSettings.UpdateFeedUrl, InitialSettings.UpdateFeedToken);
+        // Updates are off in this build: settings.json is shared with the
+        // original installed app and still names its feed, whose releases
+        // would replace this version.
+        _updates = new UpdateService(null);
 
         _selectedThemeChoice = ThemeService.Parse(InitialSettings.Theme) switch
         {
@@ -192,7 +200,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty] private string _scriptText = DefaultScript;
     [ObservableProperty] private double _fontSize = 52;
-    [ObservableProperty] private double _scrollSmoothness = 0.22;
+    private const double DefaultScrollSmoothness = 0.15;
+
+    [ObservableProperty] private double _scrollSmoothness = DefaultScrollSmoothness;
     [ObservableProperty] private double _sensitivity = 0.6;
     [ObservableProperty] private double _columnWidth = 680;
     [ObservableProperty] private bool _countdownEnabled = true;
@@ -201,6 +211,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Narrow window: secondary toolbar controls collapse into the ☰ menu.</summary>
     [ObservableProperty] private bool _isCompactToolbar;
     [ObservableProperty] private bool _flowModeEnabled;
+    [ObservableProperty] private bool _hideFromCapture;
+
+    /// <summary>Full invisibility needs Windows 10 2004+; older builds show a black box.</summary>
+    public bool CaptureProtectionSupported => CaptureProtection.IsSupported;
     [ObservableProperty] private bool _mirrorHorizontal;
     [ObservableProperty] private bool _forceSimulation;
     [ObservableProperty] private bool _isRunning;
@@ -829,6 +843,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             CountdownEnabled = CountdownEnabled,
             ShowHeardText = ShowHeardText,
             FlowModeEnabled = FlowModeEnabled,
+            HideFromCapture = HideFromCapture,
             EngineChoice = SelectedEngineChoice,
             MicrophoneName = SelectedDevice?.Name,
             RecentScripts = Scripts.Select(s => s.ToEntry()).ToArray(),
@@ -1175,6 +1190,36 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         var left = TimeSpan.FromSeconds(remaining / Math.Max(0.5, wordsPerSecond));
         return $" · ≈ {(int)left.TotalMinutes}:{left.Seconds:D2} left";
+    }
+
+    // Recognition reports a word ~0.3-0.6 s after it was spoken, so the view
+    // scrolls toward where the reader is now, not where they were.
+    private const double RecognitionLagSeconds = 0.4;
+    private const int MaxLeadWords = 4;
+
+    /// <summary>
+    /// Words the scroll target runs ahead of the last recognized word: the
+    /// measured reading pace times the recognition lag. Zero until the pace
+    /// of this take is known.
+    /// </summary>
+    public int ScrollLeadWords
+    {
+        get
+        {
+            if (!IsRunning || _firstAdvanceUtc == default || _wordsReadThisRun < 6)
+            {
+                return 0;
+            }
+
+            double elapsed = (DateTime.UtcNow - _firstAdvanceUtc).TotalSeconds;
+            if (elapsed < 2.0)
+            {
+                return 0;
+            }
+
+            double wordsPerSecond = _wordsReadThisRun / elapsed;
+            return Math.Clamp((int)Math.Round(wordsPerSecond * RecognitionLagSeconds), 0, MaxLeadWords);
+        }
     }
 
     public string AppVersion

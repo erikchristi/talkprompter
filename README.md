@@ -54,6 +54,7 @@ That is really all. Some handy extras:
 - Pauses when you pause, no fixed scroll speed
 - Works 100% offline, no cloud, no account, no subscription
 - 12 languages, switchable any time
+- Stays out of your recordings: OBS, Zoom, Teams and screenshots don't capture it, but you still see it (Windows 10 2004+, can be switched off in Settings)
 - Loads Word documents and reloads them live when you save in Word
 - Remembers your recent scripts and where you stopped in each one
 - Camera mode, mirror mode, full screen, adjustable text size and column width
@@ -77,4 +78,4 @@ MIT. Do whatever you want with it.
 
 The voice packs are downloaded from their original sources: the [Vosk models](https://alphacephei.com/vosk/models) by Alpha Cephei (Apache 2.0) and, for Indonesian, a [sherpa-onnx streaming model](https://huggingface.co/spacewave/sherpa-onnx-streaming-zipformer2-id) (MIT).
 
-TalkPrompter is made by Sven Bosau ([Bosau Digital LLC](https://pythonandvba.com)).
+This version is maintained by Logikfusion. It is based on the original MIT-licensed TalkPrompter, see [LICENSE](LICENSE).

@@ -35,6 +35,7 @@ public sealed class VoskSpeechEngine : ISpeechEngine
 
     private readonly Model _model;
     private readonly VoskRecognizer _recognizer;
+    private string _lastPartial = string.Empty;
 
     public int SampleRate { get; } = 16000;
 
@@ -147,6 +148,15 @@ public sealed class VoskSpeechEngine : ISpeechEngine
     {
         string text = ExtractText(json, isFinal ? "text" : "partial");
         text = CleanUnknowns(text);
+
+        // Vosk repeats the same partial for every ~20 ms audio chunk; only a
+        // changed one is news for the matcher and the UI.
+        if (!isFinal && string.Equals(text, _lastPartial, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastPartial = isFinal ? string.Empty : text;
         if (!string.IsNullOrWhiteSpace(text))
         {
             HypothesisReceived?.Invoke(this, new SpeechHypothesis(text, isFinal));

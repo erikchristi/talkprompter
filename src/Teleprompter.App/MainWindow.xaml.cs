@@ -27,8 +27,13 @@ public partial class MainWindow : Window
     private const double ReadingFraction = 0.33;
 
     private ScrollController? _scroll;
-    private Run[] _tokenRuns = Array.Empty<Run>();
-    private Run? _currentRun;
+
+    // The whole script is one Run; words are located by character offset.
+    // Rects are measured lazily and cached until the text re-wraps.
+    private Run? _scriptRun;
+    private ScriptToken[] _tokens = Array.Empty<ScriptToken>();
+    private Rect[] _tokenRects = Array.Empty<Rect>();
+    private int _currentToken = -1;
     private WindowState _stateBeforeFullscreen = WindowState.Normal;
     private bool _isFullscreen;
     private Rect _boundsBeforeCamera;
@@ -54,16 +59,9 @@ public partial class MainWindow : Window
         ThemeService.ThemeApplied += OnThemeApplied;
     }
 
-    private void OnThemeApplied(bool isDark)
-    {
-        // Title bar chrome + the current word highlight use resolved brushes,
-        // so both must react to a palette swap.
-        ApplyTitleBarTheme(isDark);
-        if (_currentRun is not null)
-        {
-            HighlightAndScroll(ViewModel.CurrentTokenIndex);
-        }
-    }
+    // The word marker uses a DynamicResource, so only the native title bar
+    // needs a nudge on a palette swap.
+    private void OnThemeApplied(bool isDark) => ApplyTitleBarTheme(isDark);
 
     /// <summary>Restore the last session's window placement if it is still on-screen.</summary>
     private void RestoreWindowPlacement(AppSettings settings)
@@ -137,6 +135,10 @@ public partial class MainWindow : Window
         ApplyTitleBarTheme(ThemeService.IsDarkActive);
 
         IntPtr hwnd = new WindowInteropHelper(this).Handle;
+        // Before the first frame, so the window never flashes into a recording.
+        CaptureProtection.SetEnabled(ViewModel.HideFromCapture);
+        CaptureProtection.Apply(hwnd);
+
         _hwndSource = HwndSource.FromHwnd(hwnd);
         _hwndSource?.AddHook(OnWindowMessage);
         // Best-effort: if another app owns the combo, local shortcuts still work.
@@ -188,16 +190,6 @@ public partial class MainWindow : Window
             HighlightAndScroll(ViewModel.CurrentTokenIndex);
         }
 
-        // Gentle fade-in on first render.
-        BeginAnimation(OpacityProperty, new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(220)));
-
-        // Silent background update check (installed app only), off the UI path.
-        _ = Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, async () =>
-        {
-            await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(3));
-            await ViewModel.AutoCheckUpdatesAsync();
-        });
-
         // Optional demo/test hook: launch with --autostart-sim to begin the
         // simulated reader immediately (no mic needed).
         if (Environment.GetCommandLineArgs().Contains("--autostart-sim"))
@@ -234,6 +226,7 @@ public partial class MainWindow : Window
             _hwndSource = null;
         }
 
+        CaptureProtection.SetEnabled(false);
         ThemeService.ThemeApplied -= OnThemeApplied;
         ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
         ViewModel.ScriptRebuilt -= OnScriptRebuilt;
@@ -261,19 +254,15 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.MirrorHorizontal):
                 ApplyMirror();
                 break;
-            case nameof(MainViewModel.ColumnWidth):
-                if (_currentRun is not null)
-                {
-                    HighlightAndScroll(ViewModel.CurrentTokenIndex);
-                }
-
-                break;
             case nameof(MainViewModel.FlowModeEnabled):
                 if (_scroll is not null)
                 {
                     _scroll.FlowMode = ViewModel.FlowModeEnabled;
                 }
 
+                break;
+            case nameof(MainViewModel.HideFromCapture):
+                CaptureProtection.SetEnabled(ViewModel.HideFromCapture);
                 break;
             case nameof(MainViewModel.TrackingStateText):
                 _scroll?.SetReaderPaused(ViewModel.TrackingStateText == "Paused");
@@ -304,9 +293,6 @@ public partial class MainWindow : Window
         _countdownValue = 3;
         CountdownText.Text = "3";
         CountdownOverlay.Visibility = Visibility.Visible;
-        CountdownOverlay.BeginAnimation(
-            OpacityProperty, new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(120)));
-        PulseCountdown();
 
         _countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
         _countdownTimer.Tick += OnCountdownTick;
@@ -323,20 +309,6 @@ public partial class MainWindow : Window
         }
 
         CountdownText.Text = _countdownValue.ToString();
-        PulseCountdown();
-    }
-
-    /// <summary>Scale + fade pop for each countdown digit.</summary>
-    private void PulseCountdown()
-    {
-        var scale = new DoubleAnimation(0.82, 1.0, TimeSpan.FromMilliseconds(260))
-        {
-            EasingFunction = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.6 }
-        };
-        CountdownScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
-        CountdownScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale);
-        CountdownText.BeginAnimation(
-            OpacityProperty, new DoubleAnimation(0.35, 1.0, TimeSpan.FromMilliseconds(200)));
     }
 
     private void OnCountdownClicked(object sender, RoutedEventArgs e) => CancelCountdown();
@@ -511,34 +483,94 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Finds the token whose rendered rect contains the click point. Runs are in
-    /// document order, so the scan can stop once it is past the clicked line.
+    /// Finds the clicked word: the text position under the point becomes a
+    /// character offset, and a binary search over the token starts finds the
+    /// word that contains it.
     /// </summary>
     private int HitTestToken(Point point)
     {
-        for (int i = 0; i < _tokenRuns.Length; i++)
+        if (_scriptRun is null || _tokens.Length == 0)
         {
-            Rect start = _tokenRuns[i].ContentStart.GetCharacterRect(LogicalDirection.Forward);
-            if (start.IsEmpty)
-            {
-                continue;
-            }
+            return -1;
+        }
 
-            if (start.Top > point.Y + start.Height)
-            {
-                return -1; // past the clicked line
-            }
+        TextPointer? position = Prompt.GetPositionFromPoint(point, snapToText: false);
+        if (position is null)
+        {
+            return -1; // clicked beside the text
+        }
 
-            Rect end = _tokenRuns[i].ContentEnd.GetCharacterRect(LogicalDirection.Backward);
-            var rect = new Rect(start.TopLeft, end.BottomRight);
-            rect.Inflate(2, 2);
-            if (rect.Contains(point))
+        int offset = _scriptRun.ContentStart.GetOffsetToPosition(position);
+        int lo = 0, hi = _tokens.Length - 1, found = -1;
+        while (lo <= hi)
+        {
+            int mid = (lo + hi) / 2;
+            if (_tokens[mid].Start <= offset)
             {
-                return i;
+                found = mid;
+                lo = mid + 1;
+            }
+            else
+            {
+                hi = mid - 1;
             }
         }
 
-        return -1;
+        return found >= 0 && offset <= _tokens[found].End ? found : -1;
+    }
+
+    /// <summary>
+    /// The word's box in Prompt coordinates, measured once and cached until
+    /// the text re-wraps. Empty when it cannot be measured yet.
+    /// </summary>
+    private Rect GetTokenRect(int index)
+    {
+        if (_scriptRun is null || index < 0 || index >= _tokens.Length)
+        {
+            return Rect.Empty;
+        }
+
+        Rect cached = _tokenRects[index];
+        if (!cached.IsEmpty)
+        {
+            return cached;
+        }
+
+        // Only after a rebuild or re-wrap; during reading the layout is valid.
+        if (!Prompt.IsArrangeValid)
+        {
+            Prompt.UpdateLayout();
+        }
+
+        ScriptToken token = _tokens[index];
+        TextPointer? start = _scriptRun.ContentStart.GetPositionAtOffset(token.Start);
+        TextPointer? end = _scriptRun.ContentStart.GetPositionAtOffset(token.End);
+        if (start is null || end is null)
+        {
+            return Rect.Empty;
+        }
+
+        Rect first = start.GetCharacterRect(LogicalDirection.Forward);
+        Rect last = end.GetCharacterRect(LogicalDirection.Backward);
+        if (first.IsEmpty || last.IsEmpty)
+        {
+            return Rect.Empty;
+        }
+
+        // A word never wraps, but guard against the end landing on the next line.
+        Rect rect = last.Top > first.Top + 1
+            ? new Rect(first.Left, first.Top, Math.Max(1, first.Height * 0.5), first.Height)
+            : new Rect(first.TopLeft, new Point(Math.Max(first.Left + 1, last.Right), first.Bottom));
+        _tokenRects[index] = rect;
+        return rect;
+    }
+
+    private void InvalidateTokenRects()
+    {
+        if (_tokenRects.Length > 0)
+        {
+            Array.Fill(_tokenRects, Rect.Empty);
+        }
     }
 
     private void OnToggleFullscreen(object sender, RoutedEventArgs e) => ToggleFullscreen();
@@ -571,79 +603,79 @@ public partial class MainWindow : Window
     // ----- Document build + tracking display -----
 
     /// <summary>
-    /// Rebuilds the flowing text, keeping a Run per token so the current word can
-    /// be recolored and located. Gaps between tokens (spaces, punctuation, line
-    /// breaks) are copied verbatim from the original text.
+    /// Rebuilds the flowing text as a single Run. Words are found by their
+    /// character offsets, so the script is laid out once and never touched
+    /// while reading.
     /// </summary>
     private void BuildDocument()
     {
         ScriptModel model = ViewModel.Script ?? ScriptModel.Build(ViewModel.ScriptText ?? string.Empty);
-        string text = model.Text;
 
         Prompt.Inlines.Clear();
-        _tokenRuns = new Run[model.TokenCount];
-        _currentRun = null;
+        _scriptRun = new Run(model.Text);
+        Prompt.Inlines.Add(_scriptRun);
 
-        int cursor = 0;
-        foreach (ScriptToken token in model.Tokens)
-        {
-            if (token.Start > cursor)
-            {
-                Prompt.Inlines.Add(new Run(text.Substring(cursor, token.Start - cursor)));
-            }
-
-            var run = new Run(text.Substring(token.Start, token.Length));
-            _tokenRuns[token.Index] = run;
-            Prompt.Inlines.Add(run);
-            cursor = token.End;
-        }
-
-        if (cursor < text.Length)
-        {
-            Prompt.Inlines.Add(new Run(text.Substring(cursor)));
-        }
+        _tokens = model.Tokens.ToArray();
+        _tokenRects = new Rect[_tokens.Length];
+        InvalidateTokenRects();
+        _currentToken = -1;
+        WordMarker.Visibility = Visibility.Collapsed;
 
         _scroll?.JumpTo(0);
     }
 
     private void HighlightAndScroll(int tokenIndex)
     {
-        if (_currentRun is not null)
-        {
-            _currentRun.Background = null;
-            _currentRun.ClearValue(TextElement.ForegroundProperty);
-        }
-
-        if (tokenIndex < 0 || tokenIndex >= _tokenRuns.Length)
+        if (tokenIndex < 0 || tokenIndex >= _tokens.Length)
         {
             // Position was reset (Top button, Home, script switch): the view
             // must actually go back to the top, not just drop the highlight.
-            _currentRun = null;
+            _currentToken = -1;
+            WordMarker.Visibility = Visibility.Collapsed;
             _scroll?.SetTarget(0.0);
             return;
         }
 
-        Run run = _tokenRuns[tokenIndex];
-        // Resolved per call so a live theme switch recolors the highlight.
-        run.Background = TryFindResource("Highlight") as Brush;
-        run.Foreground = TryFindResource("HighlightText") as Brush;
-        _currentRun = run;
-
-        Prompt.UpdateLayout();
-        Rect rect = run.ContentStart.GetCharacterRect(LogicalDirection.Forward);
+        _currentToken = tokenIndex;
+        Rect rect = GetTokenRect(tokenIndex);
         if (rect.IsEmpty)
         {
             return;
         }
 
-        // rect.Top is content-relative (fixed position within the text, not
-        // affected by scrolling), so the target offset is simply its position
-        // minus where we want it — the reading line. Adding the live scroll
-        // offset here would create a runaway feedback loop.
+        // Moving the box behind the text costs nothing; the text stays laid out.
+        Canvas.SetLeft(WordMarker, rect.Left - 3);
+        Canvas.SetTop(WordMarker, rect.Top);
+        WordMarker.Width = rect.Width + 6;
+        WordMarker.Height = rect.Height;
+        WordMarker.Visibility = Visibility.Visible;
+
+        // Scroll toward where the reader is now: recognition reports words
+        // late, so aim a few words past the last recognized one.
+        int leadIndex = Math.Min(_tokens.Length - 1, tokenIndex + ViewModel.ScrollLeadWords);
+        Rect leadRect = leadIndex == tokenIndex ? rect : GetTokenRect(leadIndex);
+        if (leadRect.IsEmpty)
+        {
+            leadRect = rect;
+        }
+
+        // The rect is content-relative (fixed within the text, not affected
+        // by scrolling), so the target offset is simply its position minus
+        // the reading line. Adding the live scroll offset here would create
+        // a runaway feedback loop.
         double viewport = Scroller.ViewportHeight > 0 ? Scroller.ViewportHeight : Scroller.ActualHeight;
         double readingLine = viewport * ReadingFraction;
-        double target = rect.Top - readingLine;
-        _scroll?.SetTarget(target);
+        _scroll?.SetTarget(leadRect.Top - readingLine);
+    }
+
+    // Font size, column width and window size all re-wrap the text.
+    private void OnPromptSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        InvalidateTokenRects();
+        if (_currentToken >= 0)
+        {
+            HighlightAndScroll(_currentToken);
+        }
     }
 
     // One wheel notch (delta 120) moves ~120px — about one prompter line.
@@ -669,13 +701,9 @@ public partial class MainWindow : Window
 
         // Line length is governed by the centered column (ColumnWidth); the
         // side padding is just breathing room inside it.
+        // The padding change resizes Prompt, which re-measures the word
+        // positions and re-centers the current word (OnPromptSizeChanged).
         Prompt.Padding = new Thickness(24, top, 24, bottom);
-
-        // Re-center the current word after a resize.
-        if (_currentRun is not null)
-        {
-            HighlightAndScroll(ViewModel.CurrentTokenIndex);
-        }
     }
 
     private void ApplyMirror()
@@ -696,18 +724,6 @@ public partial class MainWindow : Window
     private void OnEditScript(object sender, RoutedEventArgs e)
     {
         EditorPanel.Visibility = Visibility.Visible;
-        EditorPanel.BeginAnimation(
-            OpacityProperty,
-            new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(160)));
-
-        var slide = new TranslateTransform(0, 14);
-        EditorPanel.RenderTransform = slide;
-        slide.BeginAnimation(
-            TranslateTransform.YProperty,
-            new DoubleAnimation(14, 0, TimeSpan.FromMilliseconds(180))
-            {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            });
     }
 
     private void OnDoneEditing(object sender, RoutedEventArgs e)

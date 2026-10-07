@@ -86,10 +86,10 @@
                                       Visibility="{Binding IsCompactToolbar, Converter={StaticResource BoolToVis}}"
                                       ToolTip="More controls" />
                         <Popup PlacementTarget="{Binding ElementName=MenuToggle}" Placement="Top"
-                               StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade"
+                               StaysOpen="False" VerticalOffset="-6"
                                IsOpen="{Binding IsChecked, ElementName=MenuToggle}">
                             <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource BorderCol}"
-                                    BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,6">
+                                    BorderThickness="1" Padding="10">
                                 <StackPanel ButtonBase.Click="OnCompactMenuItemClicked" Width="190">
                                     <ComboBox ItemsSource="{Binding Scripts}" SelectedItem="{Binding SelectedScript}"
                                               DisplayMemberPath="Name" Margin="0,0,0,8"
@@ -152,11 +152,11 @@
 
                 <!-- Settings popup -->
                 <Popup PlacementTarget="{Binding ElementName=SettingsToggle}" Placement="Top"
-                       StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade"
+                       StaysOpen="False" VerticalOffset="-6"
                        IsOpen="{Binding IsChecked, ElementName=SettingsToggle}"
                        Opened="OnSettingsPopupOpened">
                     <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource BorderCol}"
-                            BorderThickness="1" CornerRadius="10" Padding="16,16,8,16" Margin="0,0,0,6" Width="320">
+                            BorderThickness="1" Padding="16,16,8,16" Width="320">
                         <!-- Taller than the window: scroll, never clip off-screen -->
                         <ScrollViewer x:Name="SettingsScroll" VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled" MaxHeight="540"
@@ -220,8 +220,8 @@
                             <ComboBox ItemsSource="{Binding EngineChoices}" SelectedItem="{Binding SelectedEngineChoice}"
                                       Margin="0,0,0,14" />
 
-                            <TextBlock Text="Scroll smoothing" Style="{StaticResource Label}" />
-                            <Slider Minimum="0.12" Maximum="0.9" Value="{Binding ScrollSmoothness}"
+                            <TextBlock Text="Scroll smoothing (left = follows faster)" Style="{StaticResource Label}" />
+                            <Slider Minimum="0.06" Maximum="0.35" Value="{Binding ScrollSmoothness}"
                                     Margin="0,0,0,14" />
 
                             <TextBlock Text="Tracking sensitivity (higher = follows through mistakes)"
@@ -234,6 +234,15 @@
                             <Slider Minimum="360" Maximum="1600" Value="{Binding ColumnWidth}"
                                     Margin="0,0,0,14" />
 
+                            <CheckBox Content="Hide from screen recording (OBS, Zoom, Teams...)"
+                                      IsChecked="{Binding HideFromCapture}"
+                                      Foreground="{DynamicResource TextCol}" Margin="0,0,0,4" />
+                            <TextBlock Foreground="{DynamicResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="22,0,0,4"
+                                       Text="You see the prompter, your recording doesn't. Screenshots (Win+Shift+S) skip it too." />
+                            <TextBlock Foreground="{DynamicResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="22,0,0,4"
+                                       Text="Needs Windows 10 2004 or newer - here it shows as a black box instead."
+                                       Visibility="{Binding CaptureProtectionSupported, Converter={StaticResource InvBoolToVis}}" />
+                            <Border Height="6" />
                             <CheckBox Content="3-2-1 countdown on Start"
                                       IsChecked="{Binding CountdownEnabled}"
                                       Foreground="{DynamicResource TextCol}" Margin="0,0,0,8" />
@@ -259,21 +268,6 @@
 
                             <Border Height="1" Background="{DynamicResource BorderCol}" Margin="0,12,0,10" />
 
-                            <CheckBox Content="Check for updates automatically on start"
-                                      IsChecked="{Binding AutoUpdateCheckEnabled}"
-                                      Foreground="{DynamicResource TextCol}" Margin="0,0,0,8" />
-                            <TextBlock Text="{Binding UpdateStatus}" Foreground="{DynamicResource Muted}"
-                                       FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6"
-                                       Visibility="{Binding UpdateStatus, Converter={StaticResource NonEmptyToVis}}" />
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                <Button Content="Check for updates" Style="{StaticResource GhostButton}"
-                                        Command="{Binding CheckUpdatesCommand}" Padding="10,5" FontSize="11" />
-                                <Button Content="Restart into update" Style="{StaticResource PrimaryButton}"
-                                        Command="{Binding RestartUpdateCommand}" Padding="10,5" FontSize="11"
-                                        Margin="8,0,0,0"
-                                        Visibility="{Binding UpdateReady, Converter={StaticResource BoolToVis}}" />
-                            </StackPanel>
-
                             <Grid>
                                 <TextBlock Foreground="{DynamicResource Muted}" FontSize="11"
                                            VerticalAlignment="Center">
@@ -284,15 +278,7 @@
                                         HorizontalAlignment="Right" Padding="10,5" FontSize="11" />
                             </Grid>
                             <TextBlock Foreground="{DynamicResource Muted}" FontSize="11"
-                                       TextWrapping="Wrap" Margin="0,6,0,0">
-                                <Run Text="Bosau Digital LLC" />
-                                <Run Text=" | " />
-                                <Hyperlink NavigateUri="https://pythonandvba.com" RequestNavigate="OnNavigateLink"
-                                           Foreground="{DynamicResource Accent}">pythonandvba.com</Hyperlink>
-                                <Run Text=" | " />
-                                <Hyperlink NavigateUri="mailto:contact@pythonandvba.com" RequestNavigate="OnNavigateLink"
-                                           Foreground="{DynamicResource Accent}">contact@pythonandvba.com</Hyperlink>
-                            </TextBlock>
+                                       TextWrapping="Wrap" Margin="0,6,0,0" Text="Logikfusion" />
                             </StackPanel>
                         </ScrollViewer>
                     </Border>
@@ -308,13 +294,21 @@
                           PreviewMouseWheel="OnPromptMouseWheel">
                 <!-- Centered column: MaxWidth keeps lines short (5-7 words) so a
                      viewer cannot see the eyes sweep left-to-right.
-                     Click any word to re-anchor the reader there. -->
-                <TextBlock x:Name="Prompt" TextWrapping="Wrap"
-                           Foreground="{DynamicResource TextCol}"
-                           FontSize="{Binding FontSize}" FontWeight="SemiBold"
-                           MaxWidth="{Binding ColumnWidth}" HorizontalAlignment="Center"
-                           Padding="24,0,24,0" TextAlignment="Left"
-                           Cursor="Hand" MouseLeftButtonUp="OnPromptClicked" />
+                     Click any word to re-anchor the reader there.
+                     The current word is marked by a box on a layer behind the
+                     text: moving it never re-lays out the script. -->
+                <Grid MaxWidth="{Binding ColumnWidth}" HorizontalAlignment="Center">
+                    <Canvas IsHitTestVisible="False">
+                        <Rectangle x:Name="WordMarker" Fill="{DynamicResource Highlight}"
+                                   RadiusX="4" RadiusY="4" Visibility="Collapsed" />
+                    </Canvas>
+                    <TextBlock x:Name="Prompt" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextCol}"
+                               FontSize="{Binding FontSize}" FontWeight="SemiBold"
+                               Padding="24,0,24,0" TextAlignment="Left"
+                               Cursor="Hand" MouseLeftButtonUp="OnPromptClicked"
+                               SizeChanged="OnPromptSizeChanged" />
+                </Grid>
             </ScrollViewer>
 
             <!-- Reading guide line at 33%; must match ReadingFraction in code-behind -->
@@ -332,12 +326,6 @@
                          Opacity="0.75" HorizontalAlignment="Right" Margin="0,0,10,0"
                          VerticalAlignment="Center" />
             </Grid>
-
-            <!-- Top and bottom fades -->
-            <Rectangle Height="160" VerticalAlignment="Top" IsHitTestVisible="False" Fill="{DynamicResource TopFade}" />
-
-            <Rectangle Height="190" VerticalAlignment="Bottom" IsHitTestVisible="False" Fill="{DynamicResource BottomFade}" />
-
 
             <!-- Live "what the engine hears" strip (toggle in Settings).
                  Only rendered when there is something to show, so no empty box. -->

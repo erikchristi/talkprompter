@@ -16,8 +16,8 @@
             <services:InverseBoolToVisibilityConverter x:Key="InvBoolToVis" />
 
             <!--
-                Buttons use a hover-overlay: a themed veil whose opacity animates
-                in over the button's own background. Text color never changes on
+                Buttons use a hover-overlay: a themed veil whose opacity switches
+                on over the button's own background (no animations, for speed). Text color never changes on
                 hover, so contrast can never clash with the label.
             -->
 
@@ -32,10 +32,7 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
-                            <Grid x:Name="root" RenderTransformOrigin="0.5,0.5">
-                                <Grid.RenderTransform>
-                                    <ScaleTransform />
-                                </Grid.RenderTransform>
+                            <Grid>
                                 <Border x:Name="bg" Background="{TemplateBinding Background}" CornerRadius="8" />
                                 <Border x:Name="veil" Background="{DynamicResource VeilBrush}" Opacity="0" CornerRadius="8" />
                                 <ContentPresenter Margin="{TemplateBinding Padding}"
@@ -43,53 +40,10 @@
                             </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="veil"
-                                                                 Storyboard.TargetProperty="Opacity"
-                                                                 To="0.14" Duration="0:0:0.12" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="veil"
-                                                                 Storyboard.TargetProperty="Opacity"
-                                                                 To="0" Duration="0:0:0.18" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="veil" Property="Opacity" Value="0.14" />
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="root"
-                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                                                 To="0.965" Duration="0:0:0.06" />
-                                                <DoubleAnimation Storyboard.TargetName="root"
-                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                                                 To="0.965" Duration="0:0:0.06" />
-                                                <DoubleAnimation Storyboard.TargetName="veil"
-                                                                 Storyboard.TargetProperty="Opacity"
-                                                                 To="0.24" Duration="0:0:0.05" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="root"
-                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                                                 To="1" Duration="0:0:0.10" />
-                                                <DoubleAnimation Storyboard.TargetName="root"
-                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                                                 To="1" Duration="0:0:0.10" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="veil" Property="Opacity" Value="0.24" />
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
                                     <Setter TargetName="bg" Property="Opacity" Value="0.4" />
@@ -110,10 +64,7 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
-                            <Grid x:Name="root" RenderTransformOrigin="0.5,0.5">
-                                <Grid.RenderTransform>
-                                    <ScaleTransform />
-                                </Grid.RenderTransform>
+                            <Grid>
                                 <Border x:Name="bg" Background="{TemplateBinding Background}"
                                         BorderBrush="{DynamicResource BorderCol}" BorderThickness="1"
                                         CornerRadius="8" />
@@ -123,53 +74,10 @@
                             </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="veil"
-                                                                 Storyboard.TargetProperty="Opacity"
-                                                                 To="0.07" Duration="0:0:0.12" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="veil"
-                                                                 Storyboard.TargetProperty="Opacity"
-                                                                 To="0" Duration="0:0:0.18" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="veil" Property="Opacity" Value="0.07" />
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="root"
-                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                                                 To="0.965" Duration="0:0:0.06" />
-                                                <DoubleAnimation Storyboard.TargetName="root"
-                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                                                 To="0.965" Duration="0:0:0.06" />
-                                                <DoubleAnimation Storyboard.TargetName="veil"
-                                                                 Storyboard.TargetProperty="Opacity"
-                                                                 To="0.13" Duration="0:0:0.05" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="root"
-                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                                                 To="1" Duration="0:0:0.10" />
-                                                <DoubleAnimation Storyboard.TargetName="root"
-                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                                                 To="1" Duration="0:0:0.10" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="veil" Property="Opacity" Value="0.13" />
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
                                     <Setter TargetName="bg" Property="Opacity" Value="0.4" />
@@ -190,10 +98,7 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="ToggleButton">
-                            <Grid x:Name="root" RenderTransformOrigin="0.5,0.5">
-                                <Grid.RenderTransform>
-                                    <ScaleTransform />
-                                </Grid.RenderTransform>
+                            <Grid>
                                 <Border x:Name="bg" Background="{DynamicResource SurfaceAlt}"
                                         BorderBrush="{DynamicResource BorderCol}" BorderThickness="1"
                                         CornerRadius="8" />
@@ -204,24 +109,7 @@
                             </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="veil"
-                                                                 Storyboard.TargetProperty="Opacity"
-                                                                 To="0.07" Duration="0:0:0.12" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="veil"
-                                                                 Storyboard.TargetProperty="Opacity"
-                                                                 To="0" Duration="0:0:0.18" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="veil" Property="Opacity" Value="0.07" />
                                 </Trigger>
                                 <Trigger Property="IsChecked" Value="True">
                                     <Setter TargetName="bg" Property="Background" Value="{DynamicResource Accent}" />
@@ -353,11 +241,11 @@
                                                   IsHitTestVisible="False"
                                                   TextElement.Foreground="{TemplateBinding Foreground}" />
                                 <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}"
-                                       AllowsTransparency="True" Placement="Bottom" PopupAnimation="Fade"
+                                       Placement="Bottom" VerticalOffset="4"
                                        StaysOpen="False">
                                     <Border Background="{DynamicResource Surface}"
                                             BorderBrush="{DynamicResource BorderCol}" BorderThickness="1"
-                                            CornerRadius="8" Margin="0,4,0,0" Padding="4"
+                                            Padding="4"
                                             MinWidth="{TemplateBinding ActualWidth}" MaxHeight="280">
                                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                                             <ItemsPresenter />

@@ -1,7 +1,10 @@
-## What's new in 1.2.0
+## What's new in 1.3.0
 
-- TalkPrompter now follows you in 12 languages: English, Czech, Dutch, French, German, Indonesian, Italian, Polish, Portuguese, Russian, Spanish and Turkish.
-- Pick your language under Settings › Language. The app downloads its voice pack once, and you can switch any time.
-- Words with letters beyond A to Z, like ä, ß, é or ł, are now recognized when the app follows your script. Before, they were skipped, which also affected German.
-- Voice pack downloads now retry on their own when the connection drops.
-- Tip: in languages other than English, write numbers as words.
+- TalkPrompter now stays out of your recordings. OBS, Zoom, Teams, Discord and the Snipping Tool no longer capture it, but you still see it on your monitor. This also covers menus, dropdowns and tooltips.
+- It is on by default. You can switch it off under Settings › Hide from screen recording, for example to take a screenshot of the app.
+- It needs Windows 10 version 2004 or newer. On older Windows, the app appears as a black box in recordings instead.
+- A camera pointed at your screen can still see the prompter.
+- Scrolling keeps up with your voice. The view now scrolls a few words ahead to make up for speech recognition delay, and the Scroll smoothing slider has a faster range (0.06 to 0.35). If your saved value was above that range, it is set back to the default.
+- The current word is marked by a box behind the text, so long scripts no longer slow down while you read.
+- Simpler, faster interface: no animations, no fades at the top and bottom of the script.
+- Automatic updates are turned off in this version.
